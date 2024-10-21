@@ -150,7 +150,7 @@ const LaunchCard = () => {
   return (
     <div className="card">
       <div className="launch-field-container">
-        <div className="launch-field-label">$</div>
+        <div className="launch-field-label-ticker">$</div>
         <input
           type="text"
           className="launch-field-input large"
@@ -160,7 +160,7 @@ const LaunchCard = () => {
       </div>
 
       <div className="launch-field-container">
-        <div className="launch-field-label">Name</div>
+        <div className="launch-field-label-name">Name</div>
         <input
           type="text"
           className="launch-field-input normal"
@@ -503,7 +503,20 @@ html, body {
   margin-bottom: 1rem;  /* Add specific margin instead of relying on gap */
 }
 
-.launch-field-label {
+.launch-field-label-ticker {
+  background-color: #C0C0C0;
+  color: black;
+  padding: 0.75rem 1rem;
+  min-width: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid black;;
+  z-index: 1;
+  font-size: 3rem;
+}
+
+.launch-field-label-name {
   background-color: #C0C0C0;
   color: black;
   padding: 0.75rem 1rem;
@@ -512,8 +525,8 @@ html, body {
   align-items: center;
   justify-content: center;
   border: 1px solid black;
-  font-weight: bold;
   z-index: 1;
+  font-size: 1.5rem;
 }
 
 .launch-field-input {
