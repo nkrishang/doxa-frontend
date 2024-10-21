@@ -1,5 +1,37 @@
 import React, { useState } from "react";
-// import diceImage from "./assets/pixel-dixed.png";
+import { useActiveAccount } from "thirdweb/react";
+
+import { client } from "./client";
+import { ConnectButton } from "thirdweb/react";
+import { darkTheme } from "thirdweb/react";
+import { createWallet } from "thirdweb/wallets";
+import { base } from "thirdweb/chains";
+
+const wallets = [
+  createWallet("io.metamask"),
+  createWallet("com.coinbase.wallet"),
+  createWallet("me.rainbow"),
+  createWallet("io.rabby"),
+  createWallet("io.zerion.wallet"),
+];
+
+const ConnectWallet = () => {
+  return (
+    <ConnectButton
+      client={client}
+      wallets={wallets}
+      theme={darkTheme({
+        colors: {
+          modalBg: "#1f1f6b",
+          accentText: "#03ffff",
+          borderColor: "#ffffff",
+        },
+      })}
+      connectButton={{ label: "Connect Wallet" }}
+      connectModal={{ size: "wide" }}
+    />
+  );
+};
 
 // First, define the CryptoSwapCard component
 const CryptoSwapCard = () => {
@@ -186,10 +218,14 @@ const AnimatedButtonCSS = ({ text = "Buy", symbol = "DOX", children }) => {
 
 // Main page component
 const CryptoExchangePage = () => {
+  const account = useActiveAccount();
   const [activeTab, setActiveTab] = useState("buy");
 
   return (
     <div className="page-container">
+      <div className="top-right-button">
+        <ConnectWallet />
+      </div>
       <div className="content-wrapper">
         <div className="tab-buttons">
           <button
@@ -524,6 +560,24 @@ html, body {
 
 .cost {
   font-weight: bold;
+}
+
+.top-right-button {
+  position: absolute; /* Remove the button from the normal flow */
+  top: 1rem; /* Adjust as needed for spacing from the top */
+  right: 1rem; /* Adjust as needed for spacing from the right */
+  z-index: 10; /* Ensures the button is above other elements */
+}
+
+.top-right-button button {
+  padding: 0.5rem 1rem; /* Add some padding to the button */
+  background-color: #800080; /* Example button color */
+  color: white; /* Text color */
+  font-size: 1.25rem;
+  font-weight: bold;
+  border: 1px solid black;
+  border-radius: 4px; /* Rounded corners */
+  cursor: pointer;
 }
 `;
 
