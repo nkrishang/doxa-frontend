@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+// import diceImage from "./assets/pixel-dixed.png";
 
 // First, define the CryptoSwapCard component
 const CryptoSwapCard = () => {
@@ -69,8 +70,17 @@ const CryptoSwapCard = () => {
             </span>
           </div>
 
-          <div className="arrow-container">
+          {/* <div className="arrow-container">
             <div className="arrow-circle">↓</div>
+          </div> */}
+
+          <div className="dice-container">
+            <img
+              width={48}
+              height={"auto"}
+              src={"/assets/dice.png"}
+              alt="A dice."
+            />
           </div>
 
           <div className="receive-section">
@@ -397,21 +407,20 @@ html, body {
   color: #800080;
 }
 
-.arrow-container {
+.dice-container {
   display: flex;
   justify-content: center;
   padding: 1rem 0;
+  animation: rotate 4s linear infinite;
 }
 
-.arrow-circle {
-  width: 40px;
-  height: 40px;
-  border: 2px solid #000;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .exchange-rate {
