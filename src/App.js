@@ -3,6 +3,10 @@ import React, { useState } from "react";
 // First, define the CryptoSwapCard component
 const CryptoSwapCard = () => {
   const [value, setValue] = useState(0.1);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchPlaceholder] = useState(
+    "Search a ticker (e.g. $DOX) or token address"
+  );
 
   const handleIncrement = () => {
     setValue((prev) => Math.round((prev + 0.01) * 100) / 100);
@@ -13,57 +17,82 @@ const CryptoSwapCard = () => {
   };
 
   return (
-    <div className="card">
-      <div className="input-container">
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => setValue(Math.max(0, parseFloat(e.target.value)))}
-          step="0.01"
-          min="0"
-          className="number-input"
-        />
-        <div className="chevron-controls">
-          <button onClick={handleIncrement} className="chevron up">
-            ▲
-          </button>
-          <button onClick={handleDecrement} className="chevron down">
-            ▼
-          </button>
+    <>
+      <div className="search-section">
+        <div className="search-container">
+          <input
+            type="text"
+            className="search-input"
+            placeholder={searchPlaceholder}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          <button className="search-button">Search</button>
         </div>
+        {searchInput && (
+          <a
+            href={`https://basescan.org/address/${searchInput}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="basescan-link"
+          >
+            View in basescan
+          </a>
+        )}
       </div>
 
-      <div className="exchange-info">
-        <div className="send-section">
-          <span className="label">You send</span>
-          <span className="amount">
-            {value.toFixed(2)} <span className="eth-currency">ETH</span>
-          </span>
+      <div className="card">
+        <div className="input-container">
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => setValue(Math.max(0, parseFloat(e.target.value)))}
+            step="0.01"
+            min="0"
+            className="number-input"
+          />
+          <div className="chevron-controls">
+            <button onClick={handleIncrement} className="chevron up">
+              ▲
+            </button>
+            <button onClick={handleDecrement} className="chevron down">
+              ▼
+            </button>
+          </div>
         </div>
 
-        <div className="arrow-container">
-          <div className="arrow-circle">↓</div>
-        </div>
+        <div className="exchange-info">
+          <div className="send-section">
+            <span className="label">You send</span>
+            <span className="amount">
+              {value.toFixed(2)} <span className="eth-currency">ETH</span>
+            </span>
+          </div>
 
-        <div className="receive-section">
-          <span className="label">You receive</span>
-          <span className="amount">
-            ~ {(value * 10000).toLocaleString()}{" "}
+          <div className="arrow-container">
+            <div className="arrow-circle">↓</div>
+          </div>
+
+          <div className="receive-section">
+            <span className="label">You receive</span>
+            <span className="amount">
+              ~ {(value * 10000).toLocaleString()}{" "}
+              <span className="dox-currency">$DOX</span>
+            </span>
+          </div>
+
+          <div className="exchange-rate">
+            {value.toFixed(2)} <span className="eth-currency">ETH</span> ={" "}
+            {(value * 10000).toLocaleString()}{" "}
             <span className="dox-currency">$DOX</span>
-          </span>
+          </div>
         </div>
 
-        <div className="exchange-rate">
-          {value.toFixed(2)} <span className="eth-currency">ETH</span> ={" "}
-          {(value * 10000).toLocaleString()}{" "}
-          <span className="dox-currency">$DOX</span>
+        <div className="button-container">
+          <AnimatedButtonCSS text="Buy" />
         </div>
       </div>
-
-      <div className="button-container">
-        <AnimatedButtonCSS />
-      </div>
-    </div>
+    </>
   );
 };
 
@@ -107,17 +136,12 @@ const LaunchCard = () => {
           You are deploying a <span className="emphasis">permissionless</span>{" "}
           ERC-20 smart contract on{" "}
           <a href="#" className="link">
-            Base mainnet
+            Base
           </a>
-          .
-        </p>
-
-        <p>
-          This contract sells 10,000 tokens in exchange for 1 ETH, and 0.3% less
-          tokens for every next 1 ETH.
-        </p>
-
-        <p>
+          . This contract sells 10,000 tokens in exchange for 1 ETH, and 0.3%
+          less tokens for every next 1 ETH.
+          <br />
+          <br />
           Learn more about{" "}
           <a href="#" className="link">
             how it works
@@ -130,23 +154,26 @@ const LaunchCard = () => {
         </p>
       </div>
 
-      <AnimatedButtonCSS />
+      <AnimatedButtonCSS text="Launch" />
     </div>
   );
 };
 
 // Define the AnimatedButtonCSS component
-const AnimatedButtonCSS = ({ children }) => {
-  const defaultText = (
-    <>
-      <span className="first-letter">B</span>
-      uy $DOX
-    </>
-  );
+const AnimatedButtonCSS = ({ text = "Buy", symbol = "DOX", children }) => {
+  const firstLetter = text[0].toUpperCase();
+  const restText = text.slice(1);
 
   return (
     <div className="button-container">
-      <button className="animated-button">{children || defaultText}</button>
+      <button className="animated-button">
+        <span className="first-letter" style={{ color: "#FFFF00" }}>
+          {firstLetter}
+        </span>
+        {restText} &nbsp;
+        <span>${symbol}</span>
+        {children}
+      </button>
     </div>
   );
 };
@@ -154,10 +181,6 @@ const AnimatedButtonCSS = ({ children }) => {
 // Main page component
 const CryptoExchangePage = () => {
   const [activeTab, setActiveTab] = useState("buy");
-  const [searchInput, setSearchInput] = useState("");
-  const [searchPlaceholder] = useState(
-    "Search a ticker (e.g. $DOX) or token address"
-  );
 
   return (
     <div className="page-container">
@@ -181,29 +204,6 @@ const CryptoExchangePage = () => {
           </button>
         </div>
 
-        <div className="search-section">
-          <div className="search-container">
-            <input
-              type="text"
-              className="search-input"
-              placeholder={searchPlaceholder}
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-            <button className="search-button">Search</button>
-          </div>
-          {searchInput && (
-            <a
-              href={`https://basescan.org/address/${searchInput}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="basescan-link"
-            >
-              View in basescan
-            </a>
-          )}
-        </div>
-
         {activeTab === "buy" ? <CryptoSwapCard /> : <LaunchCard />}
       </div>
     </div>
@@ -211,13 +211,19 @@ const CryptoExchangePage = () => {
 };
 
 const styles = `
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; /* Prevents scrolling */
+}
+
 .page-container {
   background-color: #A5A4CE;
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 2rem;
 }
 
 .content-wrapper {
@@ -496,7 +502,6 @@ const styles = `
   color: black;
   font-size: 1rem;
   line-height: 1.5;
-  margin-bottom: 1rem;  /* Add specific margin */
 }
 
 .emphasis {
