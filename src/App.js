@@ -70,10 +70,6 @@ const CryptoSwapCard = () => {
             </span>
           </div>
 
-          {/* <div className="arrow-container">
-            <div className="arrow-circle">↓</div>
-          </div> */}
-
           <div className="dice-container">
             <img
               width={48}
