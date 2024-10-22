@@ -309,7 +309,7 @@ const CryptoSwapCard = () => {
               <img
                 width={48}
                 height={"auto"}
-                src={`doxa-frontend/assets/dice.png`}
+                src={`https://nkrishang.github.io/doxa-frontend/assets/dice.png`}
                 alt="A dice."
               />
             </div>
@@ -318,7 +318,7 @@ const CryptoSwapCard = () => {
               <img
                 width={48}
                 height={"auto"}
-                src={`doxa-frontend/assets/dice.png`}
+                src={`https://nkrishang.github.io/doxa-frontend/assets/dice.png`}
                 alt="A dice."
               />
             </div>
@@ -577,7 +577,7 @@ function LaunchCard() {
           <img
             width={48}
             height={"auto"}
-            src={`doxa-frontend/assets/dice.png`}
+            src={`https://nkrishang.github.io/doxa-frontend/assets/dice.png`}
             alt="A dice."
           />
         </div>
