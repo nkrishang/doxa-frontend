@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkdoxa_frontend=self.webpackChunkdoxa_frontend||[]).push([[20521],{20521:(e,r,a)=>{a.r(r),a.d(r,{default:()=>t});const t={connecting:"Conectando a Smart Account",failedToConnect:"Error al conectar con Smart Account",wrongNetworkScreen:{title:"Red incorrecta",subtitle:"Tu cartera no est\xe1 conectada a la red requerida",failedToSwitch:"Error al cambiar de red"}}}}]);
+//# sourceMappingURL=20521.550c6c5d.chunk.js.map

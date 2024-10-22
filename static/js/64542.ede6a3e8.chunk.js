@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkdoxa_frontend=self.webpackChunkdoxa_frontend||[]).push([[64542],{64542:(t,e,n)=>{n.r(e),n.d(e,{default:()=>o});const o={connecting:"Connecting to Smart Account",failedToConnect:"Failed to connect to Smart Account",wrongNetworkScreen:{title:"Wrong Network",subtitle:"Your wallet is not connected to the required network",failedToSwitch:"Failed to switch network"}}}}]);
+//# sourceMappingURL=64542.ede6a3e8.chunk.js.map
