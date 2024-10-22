@@ -1,6 +1,6 @@
 {
   "files": {
-    "main.js": "/doxa-frontend/static/js/main.43bd146a.js",
+    "main.js": "/doxa-frontend/static/js/main.da838a15.js",
     "static/js/6957.3e0d7db6.chunk.js": "/doxa-frontend/static/js/6957.3e0d7db6.chunk.js",
     "static/js/86394.85b4b49c.chunk.js": "/doxa-frontend/static/js/86394.85b4b49c.chunk.js",
     "static/js/36374.690f36b9.chunk.js": "/doxa-frontend/static/js/36374.690f36b9.chunk.js",
@@ -828,7 +828,7 @@
     "static/js/27774.55886d5b.chunk.js": "/doxa-frontend/static/js/27774.55886d5b.chunk.js",
     "static/js/802.3036fd0b.chunk.js": "/doxa-frontend/static/js/802.3036fd0b.chunk.js",
     "index.html": "/doxa-frontend/index.html",
-    "main.43bd146a.js.map": "/doxa-frontend/static/js/main.43bd146a.js.map",
+    "main.da838a15.js.map": "/doxa-frontend/static/js/main.da838a15.js.map",
     "6957.3e0d7db6.chunk.js.map": "/doxa-frontend/static/js/6957.3e0d7db6.chunk.js.map",
     "86394.85b4b49c.chunk.js.map": "/doxa-frontend/static/js/86394.85b4b49c.chunk.js.map",
     "36374.690f36b9.chunk.js.map": "/doxa-frontend/static/js/36374.690f36b9.chunk.js.map",
@@ -1657,6 +1657,6 @@
     "802.3036fd0b.chunk.js.map": "/doxa-frontend/static/js/802.3036fd0b.chunk.js.map"
   },
   "entrypoints": [
-    "static/js/main.43bd146a.js"
+    "static/js/main.da838a15.js"
   ]
 }
