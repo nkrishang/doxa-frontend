@@ -14,6 +14,7 @@ import {
   getContract,
   readContract,
   toUnits,
+  toEther,
   prepareContractCall,
   sendTransaction,
   keccak256,
@@ -22,8 +23,8 @@ import {
 import { upload } from "thirdweb/storage";
 import { base } from "thirdweb/chains";
 
-const DOX_ADDRESS = "0x3dc2b1c20ee72cf2f745b7bb4cdb1a976b18f9e0";
-const DOXA_FACTORY_ADDRESS = "0x8191bf8672b7142de7b2ff8eeded033a672d17b4";
+const DOX_ADDRESS = "0xAb23b2B48BB6588dC30a5d3185CC747406e55288";
+const DOXA_FACTORY_ADDRESS = "0x1d5756eF591743E02c2FdDa287e34B9846017CFc";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 const factoryContract = getContract({
@@ -84,7 +85,7 @@ const CryptoSwapCard = () => {
           "function getAmountOut(uint256) public view returns (uint256, uint256,uint256)",
         params: [toUnits("1", 18)],
       });
-      setAmountPerETH(data[0]);
+      setAmountPerETH(Math.floor(parseFloat(toEther(data[0]))));
     };
 
     getAndSetAmountPerEther();
@@ -105,11 +106,23 @@ const CryptoSwapCard = () => {
       return;
     }
 
-    const registered = await readContract({
-      contract: factoryContract,
-      method: "function registered(address) view returns (bool)",
-      params: [address],
-    });
+    let registered = false;
+    try {
+      registered = await readContract({
+        contract: factoryContract,
+        method: "function registered(address) view returns (bool)",
+        params: [address],
+      });
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+      setSearchInput("");
+      setTokenAddress(ZERO_ADDRESS);
+      setTickerValue("TOKEN");
+      setAmountPerETH(0);
+
+      setDiceLoading(false);
+      return;
+    }
 
     if (!registered) {
       alert(
@@ -131,21 +144,30 @@ const CryptoSwapCard = () => {
       chain: base,
     });
 
-    const ticker = await readContract({
-      contract: token,
-      method: "function symbol() view returns (string)",
-    });
-    setTickerValue(ticker);
+    try {
+      const ticker = await readContract({
+        contract: token,
+        method: "function symbol() view returns (string)",
+      });
+      setTickerValue(ticker);
 
-    const amountOut = await readContract({
-      contract: token,
-      method:
-        "function getAmountOut(uint256) view returns (uint256,uint256,uint256)",
-      params: [toUnits(ethValue.toString(), 18)],
-    })[0];
-    setAmountPerETH(amountOut);
+      const amountOut = (
+        await readContract({
+          contract: token,
+          method:
+            "function getAmountOut(uint256) view returns (uint256,uint256,uint256)",
+          params: [toUnits("1", 18)],
+        })
+      )[0];
+
+      setAmountPerETH(Math.floor(parseFloat(toEther(amountOut))));
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+      setDiceLoading(false);
+      return;
+    }
+
     setTokenAddress(address);
-
     setDiceLoading(false);
 
     return;
@@ -256,9 +278,9 @@ const CryptoSwapCard = () => {
           <input
             type="number"
             value={ethValue}
-            onChange={(e) =>
-              setEthValue(Math.max(0.0001, parseFloat(e.target.value)))
-            }
+            onChange={(e) => {
+              setEthValue(Math.max(0.0001, parseFloat(e.target.value)));
+            }}
             step="0.0001"
             min="0.0001"
             className="number-input"
@@ -311,7 +333,7 @@ const CryptoSwapCard = () => {
           </div>
 
           <div className="exchange-rate">
-            {1} <span className="eth-currency">ETH</span> ={" "}
+            {1} <span className="eth-currency">ETH</span> = ~{" "}
             {amountPerETH.toLocaleString()}{" "}
             <span className="dox-currency">{`$${tickerValue}`}</span>
           </div>
@@ -341,6 +363,8 @@ function LaunchCard() {
   const [imageURI, setImageURI] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
   const [diceLoading, setDiceLoading] = useState(false);
+  const [txHash, setTxHash] = useState("");
+  const [tokenAddr, setTokenAddr] = useState("");
 
   // Function to handle Ticker input
   const handleTickerChange = (e) => {
@@ -390,6 +414,7 @@ function LaunchCard() {
       setDiceLoading(false);
       return;
     }
+    setTokenAddr(tokenAddress);
 
     let metadataURI = "";
     try {
@@ -409,30 +434,29 @@ function LaunchCard() {
       return;
     }
 
+    let transactionHash = "";
     try {
       const transaction = prepareContractCall({
         contract: factoryContract,
-        method: "function createToken(string,string,string) returns (address)",
-        params: [name, ticker, metadataURI],
+        method:
+          "function createToken(string,string,string, bytes32) returns (address)",
+        params: [name, ticker, metadataURI, salt],
         chain: base,
       });
 
-      const { transactionHash } = await sendTransaction({
+      const { transactionHash: hash } = await sendTransaction({
         transaction,
         account: wallet.getAccount(),
         chain: base,
       });
-
-      alert(
-        `Success! Deployed token at: https://basescan.org/address/${tokenAddress}\nTransaction: https://basescan.org/tx/${transactionHash}`
-      );
+      transactionHash = hash;
     } catch (e) {
       alert(`Error: ${e.message}`);
+      setDiceLoading(false);
+      return;
     }
+    setTxHash(transactionHash);
 
-    setName("");
-    setDescription("");
-    setTicker("");
     setDiceLoading(false);
   };
 
@@ -557,6 +581,29 @@ function LaunchCard() {
             alt="A dice."
           />
         </div>
+      ) : txHash ? (
+        <p className="eth-currency">
+          Success! Deployed token:{" "}
+          <span>
+            <a
+              href={`https://basescan.org/address/${tokenAddr}`}
+              target="blank"
+              rel="noreferrer"
+            >
+              {tokenAddr}
+            </a>
+          </span>{" "}
+          at transaction{" "}
+          <span>
+            <a
+              href={`https://basescan.org/tx/${txHash}`}
+              target="blank"
+              rel="noreferrer"
+            >
+              {txHash}
+            </a>
+          </span>
+        </p>
       ) : (
         <div className="launch-info">
           <p>
@@ -913,50 +960,6 @@ html, body {
 }
 
 /* Launch Card specific styles */
-.launch-field-container {
-  display: flex;
-  width: 100%;
-  position: relative;
-  margin-bottom: 1rem;  /* Add specific margin instead of relying on gap */
-}
-
-.launch-field-label-ticker {
-  background-color: #C0C0C0;
-  color: black;
-  padding: 0.75rem 1rem;
-  min-width: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid black;;
-  z-index: 1;
-  font-size: 3rem;
-}
-
-.launch-field-label-name {
-  background-color: #C0C0C0;
-  color: black;
-  padding: 0.75rem 1rem;
-  min-width: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid black;
-  z-index: 1;
-  font-size: 1.5rem;
-}
-
-.launch-field-input {
-  flex: 1;
-  background-color: #0000FF;
-  color: #03FFFF;
-  border: none;
-  padding: 0.75rem 1rem;
-  box-shadow: inset 4px 4px 16px rgba(0, 0, 0, 0.48);
-  outline: none;
-  font-size: 1.5rem;
-}
-
 .launch-info {
   display: flex;
   flex-direction: column;
