@@ -1,11 +1,41 @@
-import React, { useState } from "react";
-import { useActiveAccount } from "thirdweb/react";
+import React, { useEffect, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 
 import { client } from "./client";
-import { ConnectButton } from "thirdweb/react";
-import { darkTheme } from "thirdweb/react";
+import {
+  ConnectButton,
+  darkTheme,
+  useActiveWallet,
+  useActiveWalletConnectionStatus,
+} from "thirdweb/react";
 import { createWallet } from "thirdweb/wallets";
+import {
+  isAddress,
+  getContract,
+  readContract,
+  toUnits,
+  prepareContractCall,
+  sendTransaction,
+  keccak256,
+  stringToHex,
+} from "thirdweb";
+import { upload } from "thirdweb/storage";
 import { base } from "thirdweb/chains";
+
+const DOX_ADDRESS = "0x3dc2b1c20ee72cf2f745b7bb4cdb1a976b18f9e0";
+const DOXA_FACTORY_ADDRESS = "0x8191bf8672b7142de7b2ff8eeded033a672d17b4";
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const factoryContract = getContract({
+  client,
+  address: DOXA_FACTORY_ADDRESS,
+  chain: base,
+});
+const doxaTokenContract = getContract({
+  client,
+  address: DOX_ADDRESS,
+  chain: base,
+});
 
 const wallets = [
   createWallet("io.metamask"),
@@ -35,18 +65,159 @@ const ConnectWallet = () => {
 
 // First, define the CryptoSwapCard component
 const CryptoSwapCard = () => {
-  const [value, setValue] = useState(0.1);
-  const [searchInput, setSearchInput] = useState("");
-  const [searchPlaceholder] = useState(
-    "Search a ticker (e.g. $DOX) or token address"
-  );
+  const wallet = useActiveWallet();
+  const connectionStatus = useActiveWalletConnectionStatus();
+
+  const [ethValue, setEthValue] = useState(0.1);
+  const [searchInput, setSearchInput] = useState(DOX_ADDRESS);
+  const [tokenAddress, setTokenAddress] = useState(DOX_ADDRESS);
+
+  const [diceLoading, setDiceLoading] = useState(false);
+  const [tickerValue, setTickerValue] = useState("DOX");
+  const [amountPerETH, setAmountPerETH] = useState(10000);
+
+  useEffect(() => {
+    const getAndSetAmountPerEther = async () => {
+      const data = await readContract({
+        contract: doxaTokenContract,
+        method:
+          "function getAmountOut(uint256) public view returns (uint256, uint256,uint256)",
+        params: [toUnits("1", 18)],
+      });
+      setAmountPerETH(data[0]);
+    };
+
+    getAndSetAmountPerEther();
+  }, []);
+
+  const handleSearch = async (address) => {
+    setDiceLoading(true);
+
+    if (!isAddress(address)) {
+      alert("Error: invalid address! Please check your search input.");
+
+      setSearchInput("");
+      setTokenAddress(ZERO_ADDRESS);
+      setTickerValue("TOKEN");
+      setAmountPerETH(0);
+
+      setDiceLoading(false);
+      return;
+    }
+
+    const registered = await readContract({
+      contract: factoryContract,
+      method: "function registered(address) view returns (bool)",
+      params: [address],
+    });
+
+    if (!registered) {
+      alert(
+        "Error: address not a Doxa contract! Please check your search input."
+      );
+
+      setSearchInput("");
+      setTokenAddress(ZERO_ADDRESS);
+      setTickerValue("TOKEN");
+      setAmountPerETH(0);
+
+      setDiceLoading(false);
+      return;
+    }
+
+    const token = getContract({
+      client,
+      address,
+      chain: base,
+    });
+
+    const ticker = await readContract({
+      contract: token,
+      method: "function symbol() view returns (string)",
+    });
+    setTickerValue(ticker);
+
+    const amountOut = await readContract({
+      contract: token,
+      method:
+        "function getAmountOut(uint256) view returns (uint256,uint256,uint256)",
+      params: [toUnits(ethValue.toString(), 18)],
+    })[0];
+    setAmountPerETH(amountOut);
+    setTokenAddress(address);
+
+    setDiceLoading(false);
+
+    return;
+  };
 
   const handleIncrement = () => {
-    setValue((prev) => Math.round((prev + 0.01) * 100) / 100);
+    setEthValue((prev) => Math.round((prev + 0.01) * 100) / 100);
   };
 
   const handleDecrement = () => {
-    setValue((prev) => Math.max(0, Math.round((prev - 0.01) * 100) / 100));
+    setEthValue((prev) =>
+      Math.max(0.0001, Math.round((prev - 0.01) * 100) / 100)
+    );
+  };
+
+  const handleBuy = async () => {
+    setDiceLoading(true);
+
+    if (connectionStatus === "disconnected") {
+      alert("Error: Please connect your wallet.");
+      setDiceLoading(false);
+      return;
+    }
+
+    if (!isAddress(tokenAddress) || tokenAddress === ZERO_ADDRESS) {
+      alert("Error: Please search for a valid token to buy.");
+      setDiceLoading(false);
+      return;
+    }
+
+    if (ethValue <= 0) {
+      alert("Error: Please enter a valid amount of eth to send.");
+      setDiceLoading(false);
+      return;
+    }
+
+    if (wallet.getChain().id !== base.id) {
+      try {
+        await wallet.switchChain(base);
+      } catch (e) {
+        alert(`Error: ${e.message}`);
+        setDiceLoading(false);
+        return;
+      }
+    }
+
+    try {
+      const token = getContract({
+        client,
+        address: tokenAddress,
+        chain: base,
+      });
+
+      const transaction = prepareContractCall({
+        contract: token,
+        method: "function buy()",
+        value: toUnits(ethValue.toString(), 18),
+        chain: base,
+      });
+
+      const { transactionHash } = await sendTransaction({
+        transaction,
+        account: wallet.getAccount(),
+        chain: base,
+      });
+
+      alert(`Transaction sent: https://basescan.org/tx/${transactionHash}`);
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+    }
+
+    setDiceLoading(false);
   };
 
   return (
@@ -56,20 +227,26 @@ const CryptoSwapCard = () => {
           <input
             type="text"
             className="search-input"
-            placeholder={searchPlaceholder}
+            placeholder={"Search a token address e.g 0x3dc2b1c20e..."}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
+            disabled={diceLoading}
           />
-          <button className="search-button">Search</button>
+          <button
+            className="search-button"
+            onClick={(e) => handleSearch(searchInput)}
+          >
+            Search
+          </button>
         </div>
-        {searchInput && (
+        {tokenAddress !== ZERO_ADDRESS && (
           <a
-            href={`https://basescan.org/address/${searchInput}`}
+            href={`https://basescan.org/address/${tokenAddress}`}
             target="_blank"
             rel="noopener noreferrer"
             className="basescan-link"
           >
-            View in basescan
+            {`View in basescan: ${tokenAddress}`}
           </a>
         )}
       </div>
@@ -78,11 +255,14 @@ const CryptoSwapCard = () => {
         <div className="input-container">
           <input
             type="number"
-            value={value}
-            onChange={(e) => setValue(Math.max(0, parseFloat(e.target.value)))}
-            step="0.01"
-            min="0"
+            value={ethValue}
+            onChange={(e) =>
+              setEthValue(Math.max(0.0001, parseFloat(e.target.value)))
+            }
+            step="0.0001"
+            min="0.0001"
             className="number-input"
+            disabled={diceLoading}
           />
           <div className="chevron-controls">
             <button onClick={handleIncrement} className="chevron up">
@@ -98,113 +278,344 @@ const CryptoSwapCard = () => {
           <div className="send-section">
             <span className="label">You send</span>
             <span className="amount">
-              {value.toFixed(2)} <span className="eth-currency">ETH</span>
+              {ethValue.toFixed(4)} <span className="eth-currency">ETH</span>
             </span>
           </div>
 
-          <div className="dice-container">
-            <img
-              width={48}
-              height={"auto"}
-              src={"/assets/dice.png"}
-              alt="A dice."
-            />
-          </div>
+          {diceLoading ? (
+            <div className="dice-container-loading">
+              <img
+                width={48}
+                height={"auto"}
+                src={"/assets/dice.png"}
+                alt="A dice."
+              />
+            </div>
+          ) : (
+            <div className="dice-container">
+              <img
+                width={48}
+                height={"auto"}
+                src={"/assets/dice.png"}
+                alt="A dice."
+              />
+            </div>
+          )}
 
           <div className="receive-section">
             <span className="label">You receive</span>
             <span className="amount">
-              ~ {(value * 10000).toLocaleString()}{" "}
-              <span className="dox-currency">$DOX</span>
+              ~ {(ethValue * amountPerETH).toLocaleString()}{" "}
+              <span className="dox-currency">{`$${tickerValue}`}</span>
             </span>
           </div>
 
           <div className="exchange-rate">
-            {value.toFixed(2)} <span className="eth-currency">ETH</span> ={" "}
-            {(value * 10000).toLocaleString()}{" "}
-            <span className="dox-currency">$DOX</span>
+            {1} <span className="eth-currency">ETH</span> ={" "}
+            {amountPerETH.toLocaleString()}{" "}
+            <span className="dox-currency">{`$${tickerValue}`}</span>
           </div>
         </div>
 
         <div className="button-container">
-          <AnimatedButtonCSS text="Buy" />
+          <AnimatedButtonCSS
+            text="Buy"
+            symbol={tickerValue}
+            toDisable={diceLoading}
+            handler={handleBuy}
+          />
         </div>
       </div>
     </>
   );
 };
 
-// Next, define the  component
-const LaunchCard = () => {
-  const [symbol, setSymbol] = useState("DOX");
-  const [name, setName] = useState("Doxa Cash");
+function LaunchCard() {
+  const wallet = useActiveWallet();
+  const connectionStatus = useActiveWalletConnectionStatus();
 
-  const handleSymbolChange = (e) => {
+  // State variables for each field
+  const [ticker, setTicker] = useState("");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageURI, setImageURI] = useState("");
+  const [imagePreview, setImagePreview] = useState(null);
+  const [diceLoading, setDiceLoading] = useState(false);
+
+  // Function to handle Ticker input
+  const handleTickerChange = (e) => {
     const value = e.target.value
       .toUpperCase()
       .replace(/[^A-Z]/g, "")
       .slice(0, 5);
-    setSymbol(value);
+    setTicker(value);
+  };
+
+  const handleLaunch = async () => {
+    setDiceLoading(true);
+
+    if (!ticker || !name) {
+      alert("Error: ticker and name are required!");
+      setDiceLoading(false);
+      return;
+    }
+
+    if (connectionStatus === "disconnected") {
+      alert("Error: Please connect your wallet.");
+      setDiceLoading(false);
+      return;
+    }
+
+    if (wallet.getChain().id !== base.id) {
+      try {
+        await wallet.switchChain(base);
+      } catch (e) {
+        alert(`Error: ${e.message}`);
+        setDiceLoading(false);
+        return;
+      }
+    }
+
+    const salt = keccak256(stringToHex(uuidv4() + wallet.address));
+    let tokenAddress = "";
+    try {
+      tokenAddress = await readContract({
+        contract: factoryContract,
+        method:
+          "function predictTokenAddress(bytes32) public view returns (address)",
+        params: [salt],
+      });
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+      setDiceLoading(false);
+      return;
+    }
+
+    let metadataURI = "";
+    try {
+      metadataURI = await upload({
+        client,
+        files: [
+          {
+            name: name,
+            description: description,
+            image: imageURI,
+          },
+        ],
+      });
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+      setDiceLoading(false);
+      return;
+    }
+
+    try {
+      const transaction = prepareContractCall({
+        contract: factoryContract,
+        method: "function createToken(string,string,string) returns (address)",
+        params: [name, ticker, metadataURI],
+        chain: base,
+      });
+
+      const { transactionHash } = await sendTransaction({
+        transaction,
+        account: wallet.getAccount(),
+        chain: base,
+      });
+
+      alert(
+        `Success! Deployed token at: https://basescan.org/address/${tokenAddress}\nTransaction: https://basescan.org/tx/${transactionHash}`
+      );
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+    }
+
+    setName("");
+    setDescription("");
+    setTicker("");
+    setDiceLoading(false);
+  };
+
+  // Function to handle image upload and resizing
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const validFileTypes = ["image/jpeg", "image/png", "image/gif"];
+    if (!validFileTypes.includes(file.type)) {
+      alert("Error: Only JPG, PNG, or GIF files are allowed.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      // 2 MB limit
+      alert("Error: file size larger than the max. 2 MB");
+      return;
+    }
+
+    try {
+      const uri = await upload({
+        client,
+        files: [file],
+      });
+      setImageURI(uri);
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        // Create a canvas to resize the image
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const maxWidth = 200;
+
+        // Calculate the new width and height
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = (maxWidth / width) * height;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const resizedImage = canvas.toDataURL(file.type); // Convert to base64 for preview
+        setImagePreview(resizedImage);
+      };
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
     <div className="card">
-      <div className="launch-field-container">
-        <div className="launch-field-label-ticker">$</div>
-        <input
-          type="text"
-          className="launch-field-input large"
-          value={symbol}
-          onChange={handleSymbolChange}
+      <div className="launch-input-flex">
+        {/* Ticker Input */}
+        <div className="launch-input-group">
+          <label>$Ticker</label>
+          <input
+            type="text"
+            disabled={diceLoading}
+            value={ticker}
+            onChange={handleTickerChange}
+            placeholder="Ticker"
+          />
+        </div>
+
+        {/* Name Input */}
+        <div className="launch-input-group">
+          <label>Name</label>
+          <input
+            type="text"
+            disabled={diceLoading}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Name"
+          />
+        </div>
+      </div>
+
+      {/* Description Input */}
+      <div className="launch-input-group">
+        <label>Description</label>
+        <textarea
+          value={description}
+          disabled={diceLoading}
+          onChange={(e) => setDescription(e.target.value.slice(0, 280))}
+          placeholder="Description"
         />
+        <small>{description.length}/280</small>
       </div>
 
-      <div className="launch-field-container">
-        <div className="launch-field-label-name">Name</div>
+      {/* Image Upload */}
+      <div className="launch-input-group">
+        <label>Upload image (JPG, PNG, GIF only):</label>
         <input
-          type="text"
-          className="launch-field-input normal"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          type="file"
+          onChange={handleImageUpload}
+          disabled={diceLoading}
         />
+        {imagePreview && (
+          <div>
+            <img src={imagePreview} alt="Preview" className="image-preview" />
+          </div>
+        )}
       </div>
 
-      <div className="launch-info">
-        <p>
-          You are deploying a <span className="emphasis">permissionless</span>{" "}
-          ERC-20 smart contract on{" "}
-          <a href="#" className="link">
-            Base
-          </a>
-          . This contract sells 10,000 tokens in exchange for 1 ETH, and 0.3%
-          less tokens for every next 1 ETH.
-          <br />
-          <br />
-          Learn more about{" "}
-          <a href="#" className="link">
-            how it works
-          </a>
-          .
-        </p>
+      {diceLoading ? (
+        <div className="dice-container-loading">
+          <img
+            width={48}
+            height={"auto"}
+            src={"/assets/dice.png"}
+            alt="A dice."
+          />
+        </div>
+      ) : (
+        <div className="launch-info">
+          <p>
+            You are deploying a <span className="emphasis">permissionless</span>{" "}
+            ERC-20 smart contract on{" "}
+            <a
+              href="https://www.base.org/"
+              className="link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Base
+            </a>
+            . This contract sells 10,000 tokens in exchange for 1 ETH, and 0.3%
+            less tokens for every next 1 ETH.
+            <br />
+            <br />
+            Learn more about{" "}
+            <a
+              href="https://hackmd.io/@monkeymeaning/doxa"
+              className="link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              how it works
+            </a>
+            .
+          </p>
+        </div>
+      )}
 
-        <p className="cost">
-          Cost: ~ <span className="purple-text">$0.002</span>
-        </p>
-      </div>
-
-      <AnimatedButtonCSS text="Launch" />
+      <AnimatedButtonCSS
+        text="Launch"
+        symbol={!ticker ? "TOKEN" : ticker}
+        handler={handleLaunch}
+        toDisable={diceLoading}
+      />
     </div>
   );
-};
+}
 
 // Define the AnimatedButtonCSS component
-const AnimatedButtonCSS = ({ text = "Buy", symbol = "DOX", children }) => {
+const AnimatedButtonCSS = ({
+  text = "Buy",
+  symbol = "DOX",
+  toDisable = false,
+  handler,
+  children,
+}) => {
   const firstLetter = text[0].toUpperCase();
   const restText = text.slice(1);
 
   return (
     <div className="button-container">
-      <button className="animated-button">
+      <button
+        className="animated-button"
+        onClick={handler}
+        disabled={toDisable}
+      >
         <span className="first-letter" style={{ color: "#FFFF00" }}>
           {firstLetter}
         </span>
@@ -218,13 +629,12 @@ const AnimatedButtonCSS = ({ text = "Buy", symbol = "DOX", children }) => {
 
 // Main page component
 const CryptoExchangePage = () => {
-  const account = useActiveAccount();
   const [activeTab, setActiveTab] = useState("buy");
 
   return (
     <div className="page-container">
       <div className="top-right-button">
-        <ConnectWallet />
+        <ConnectWallet chain={base} />
       </div>
       <div className="content-wrapper">
         <div className="tab-buttons">
@@ -271,7 +681,7 @@ html, body {
 .content-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1rem;
   width: fit-content;  /* Change from 100% to fit-content */
   max-width: 480px;
   margin: 0 auto;
@@ -280,12 +690,12 @@ html, body {
 .tab-buttons {
   display: flex;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .tab-button {
   flex: 1;
-  padding: 0.75rem 2rem;
+  padding: 0.5rem 0.5rem;
   font-size: 1.25rem;
   font-weight: bold;
   border: 1px solid black;
@@ -446,6 +856,13 @@ html, body {
   animation: rotate 4s linear infinite;
 }
 
+.dice-container-loading {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0;
+  animation: rotate 0.4s linear infinite;
+}
+
 @keyframes rotate {
   from {
     transform: rotate(0deg);
@@ -463,7 +880,7 @@ html, body {
 
 .button-container {
   position: relative;
-  width: 200px;
+  width: 240px;
   height: 40px;
   margin: 0 auto;
   margin-bottom: 1rem;
@@ -481,7 +898,7 @@ html, body {
   border: 1px solid black;
   box-shadow: 16px 16px 4px rgba(0, 0, 0, 0.32);
   transition: all 0.3s ease;
-  width: 200px;
+  width: 240px;
   cursor: pointer;
 }
 
@@ -537,16 +954,7 @@ html, body {
   padding: 0.75rem 1rem;
   box-shadow: inset 4px 4px 16px rgba(0, 0, 0, 0.48);
   outline: none;
-}
-
-.launch-field-input.large {
-  font-size: 2rem;
-  height: 64px;
-}
-
-.launch-field-input.normal {
   font-size: 1.5rem;
-  height: 48px;
 }
 
 .launch-info {
@@ -592,6 +1000,41 @@ html, body {
   border-radius: 4px; /* Rounded corners */
   cursor: pointer;
 }
+
+  .launch-input-flex {
+    display: flex;
+    gap: 2rem;
+  }
+
+  .launch-input-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: black; /* Black label font color */
+  }
+
+  .card input[type="text"],
+  .card textarea {
+    width: 100%;
+    padding: 0.5rem; /* Appropriate padding */
+    background-color: #0000FF; /* Blue background color */
+    color: #03FFFF; /* Cyan font color */
+    box-shadow: inset 4px 4px 16px rgba(0, 0, 0, 0.48); /* Box shadow */
+    border: none;
+    border-radius: 4px; /* Slight rounding */
+    font-size: 1rem; /* Adjust font size */
+  }
+
+  .card textarea {
+    min-height: 50px;
+    resize: none;
+  }
+
+  .image-preview {
+    margin-top: 1rem;
+    max-height: 100px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
 `;
 
 const styleSheet = document.createElement("style");
